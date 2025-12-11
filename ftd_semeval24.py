@@ -21,17 +21,16 @@ from datasets import load_dataset
 import os
 
 
-# LLM_name = "microsoft/phi-2"#
-# LLM_name = "meta-llama/Llama-3.1-8B"
+# LLM_name = "microsoft/phi-2"
+LLM_name = "meta-llama/Llama-3.1-8B"
 # LLM_name = "Qwen/Qwen3-4B"
 # LLM_name = "meta-llama/Llama-3.2-3B"
 # LLM_name = "meta-llama/Llama-3.2-1B"
 # LLM_name = "Qwen/Qwen3-1.7B"
-# LLM_name = "Qwen/Qwen2-7B"
-LLM_name = "EleutherAI/gpt-neo-2.7B"
+# LLM_name = "google/gemma-2-2b"
 layer_type = 'decoder_block'
 
-dataset_name="Jinyan1/COLING_2025_MGT_en"
+dataset_name="/semeval24"
 dir_path = f'./data/{LLM_name.split("/")[-1]}/{dataset_name.split("/")[-1]}/'
 if not os.path.exists(dir_path):
     os.makedirs(dir_path)
@@ -57,16 +56,20 @@ print(num_layers, hidden_size, max_seq_length)
 
 
 print('Loading datasets')
-dataset = load_dataset(dataset_name)
-test_df = np.array(pd.read_json('./data/dataset/coling25_en_test.jsonl', lines=True)['text'])
+# dataset = load_dataset(dataset_name)
+train_df = pd.read_json('data/dataset/semeval24/subtaskA_train_monolingual.jsonl', lines=True)
+dev_df = pd.read_json('data/dataset/semeval24/subtaskA_dev_monolingual.jsonl', lines=True)
+test_df = pd.read_json('data/dataset/semeval24/subtaskA_dev_monolingual.jsonl', lines=True)
 
-real_train = dataset['train'].filter(lambda example: example["label"]==0)
-fake_train = dataset['train'].filter(lambda example: example["label"]==1)
+real_train = train_df[train_df['label']==0]#.filter(lambda example: example["label"]==0)
+fake_train = train_df[train_df['label']==1]#.filter(lambda example: example["label"]==1)
 
-print(len(real_train), len(fake_train))
+print('Train', len(real_train), len(fake_train))
 
-real_dev = dataset['dev'].filter(lambda example: example["label"]==0)
-fake_dev = dataset['dev'].filter(lambda example: example["label"]==1)
+real_dev = dev_df[dev_df['label']==0]#.filter(lambda example: example["label"]==0)
+fake_dev = dev_df#.filter(lambda example: example["label"]==1)
+
+print('Val', len(real_dev), len(fake_dev))
 
 
 print('Сalculation of activations...')
@@ -99,15 +102,8 @@ def get_dataset_activations(dataset, prefix):
     if num_batch*20000 > len(dataset):
         return np.array(means).mean(axis=0)
         
-    x = 0
     for sample in tqdm(dataset[num_batch*20000:]):
-        # try:
         samples.append(get_sample_activations(sample))
-        # except Exception as e:
-        #     print(x)
-        #     print(f'Error: {e}')
-        #     x += 1
-        #     continue
         if len(samples) % 20000 == 0:
             print('Saving activations...')
             np.save(f'{dir_path}{prefix}_activations_{num_batch*20000}-{(num_batch+1)*20000}.npy', np.array(samples))
@@ -127,22 +123,22 @@ def get_dataset_activations(dataset, prefix):
 
 
 
-real_train_means = get_dataset_activations(real_train, prefix='real_train')
+real_train_means = get_dataset_activations(real_train['text'].tolist(), prefix='real_train')
 np.save(f'{dir_path}real_train_means.npy', real_train_means)
 # real_train_means = np.load(f'{dir_path}real_train_means.npy')
 
-fake_train_means = get_dataset_activations(fake_train, prefix='fake_train')
+fake_train_means = get_dataset_activations(fake_train['text'].tolist(), prefix='fake_train')
 np.save(f'{dir_path}fake_train_means.npy', fake_train_means)
 # fake_train_means = np.load(f'{dir_path}fake_train_means.npy')
 
-test_means = get_dataset_activations(test_df, prefix='test')
-
-real_val_means = get_dataset_activations(real_dev, prefix='real_val')
+real_val_means = get_dataset_activations(real_dev['text'].tolist(), prefix='real_val')
 np.save(f'{dir_path}real_val_means.npy', real_val_means)
 # real_val_means = np.load(f'{dir_path}real_val_means.npy')
 
-fake_val_means = get_dataset_activations(fake_dev, prefix='fake_val')
+fake_val_means = get_dataset_activations(fake_dev['text'].tolist(), prefix='fake_val')
 np.save(f'{dir_path}fake_val_means.npy', fake_val_means)
+
+test_means = get_dataset_activations(test_df['text'].tolist(), prefix='test')
 
     
 print('Сalculating mean steering vectors...')
