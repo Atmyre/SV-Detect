@@ -1,0 +1,18 @@
+# SV-Detect — pip requirements (mirror of environment.yml).
+# Tested on Python 3.11.15 with CUDA 12.8.
+torch>=2.10
+torchvision
+numpy>=2.2
+pandas>=3.0
+scikit-learn>=1.8
+matplotlib>=3.9
+pillow
+tqdm
+transformers>=4.57
+datasets>=3.0
+safetensors
+huggingface_hub
+steering-vectors
+# Optional (interpretability extras)
+sae_lens
+pymupdf

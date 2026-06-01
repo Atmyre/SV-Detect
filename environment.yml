@@ -1,0 +1,32 @@
+name: sv-detect
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  # PyTorch + CUDA — match what we used on the cluster
+  - pytorch=2.10.*
+  - pytorch-cuda=12.8
+  - torchvision
+  # Numerics + plotting
+  - numpy>=2.2
+  - pandas>=3.0
+  - scikit-learn>=1.8
+  - matplotlib>=3.9
+  - pillow
+  # Data
+  - tqdm
+  # Pip-only
+  - pip:
+      - transformers>=4.57
+      - datasets>=3.0
+      - safetensors
+      - huggingface_hub
+      - steering-vectors        # for the interpretability notebook
+      # Optional: SAE feature attribution
+      - sae_lens
+      # Optional: PDF/figure utilities
+      - pymupdf
