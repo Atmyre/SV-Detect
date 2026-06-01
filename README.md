@@ -6,18 +6,6 @@ hidden-state activations with learned "real-vs-fake" steering vectors in
 a frozen reference language model, then trains a lightweight logistic
 regression on those alignment scores.
 
-The repository reproduces every experiment in the paper:
-
-- DetectRL (Multi-Domain, Multi-LLM, Multi-Attack including Mixing).
-- MIRAGE (DIG / SIG; GENERATE / POLISH / REWRITE).
-- Cross-benchmark transfer (MIRAGE-trained SVs → DetectRL evaluation).
-- Per-layer attribution, classical logit-lens, stylistic-feature
-  baseline, cross-LM logit-lens, per-token visualisation.
-- COLING-2025 MGT (English) with GPT-Neo-2.7B and Llama-2-7B backbones.
-- Inference-latency benchmark (Section B).
-- Backbone ablation (Section C, GPT-Neo / Qwen3-1.7B / Gemma-3-1B-pt /
-  Gemma-3-1B-it).
-
 ## Layout
 
 ```
