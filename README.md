@@ -295,7 +295,7 @@ See the paper for the reference numbers each of these reproduces.
 ```bibtex
 @inproceedings{anonymous2026svdetect,
     title     = {{SV}-Detect: {AI}-generated Text Detection with Steering Vectors},
-    author    = {Anonymous},
+    author    = {Vishnyakov, Mikhail and Gaintseva, Tatiana},
     booktitle = {The 2026 Conference on Empirical Methods in Natural Language Processing},
     year      = {2026},
     url       = {https://openreview.net/forum?id=eVSq1xBtS7}
