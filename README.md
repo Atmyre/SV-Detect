@@ -7,8 +7,8 @@
 
 Code for *SV-Detect: AI-generated Text Detection with Steering Vectors*.
 
-SV-Detect is a method for detecting AI-generated text using the internal
-representations of a frozen language model. Instead of relying only on
+**SV-Detect is a method for detecting AI-generated text using the internal
+representations of a frozen language model.** Instead of relying only on
 surface-level text features, SV-Detect learns steering vectors that
 separate human-written and machine-generated text in the model's hidden
 representation space. For each input text, it measures how strongly the
@@ -20,9 +20,9 @@ The method is lightweight because it does not require fine-tuning the
 underlying language model. It generalizes across challenging settings,
 including different text domains, different source models, and
 machine-edited text such as polished or rewritten passages. Overall,
-SV-Detect treats AI-generated text detection as a representation-space
+**SV-Detect treats AI-generated text detection as a representation-space
 probing problem and shows that steering vectors provide a simple,
-interpretable, and effective way to detect machine-generated text.
+interpretable, and effective way to detect machine-generated text.**
 
 <table>
 <tr>
