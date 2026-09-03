@@ -24,6 +24,16 @@ SV-Detect treats AI-generated text detection as a representation-space
 probing problem and shows that steering vectors provide a simple,
 interpretable, and effective way to detect machine-generated text.
 
+<p align="center">
+  <img src="docs/pipeline.png" alt="Overview of SV-Detect" width="600">
+</p>
+
+*Overview of SV-Detect. A frozen LLM is used to extract mean-pooled
+hidden activations from each layer. Activations are projected onto
+layer-wise steering vectors, and the resulting cosine similarity scores
+are standardized and passed to a logistic regression classifier for
+AI-generated text detection.*
+
 ## Layout
 
 ```
