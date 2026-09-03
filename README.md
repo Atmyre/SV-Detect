@@ -1,6 +1,9 @@
 # SV-Detect
 
 [![arXiv](https://img.shields.io/badge/arXiv-2606.07313-b31b1b.svg)](https://arxiv.org/abs/2606.07313)
+[![EMNLP 2026](https://img.shields.io/badge/EMNLP-2026%20Main-blue.svg)](https://2026.emnlp.org/)
+
+**Accepted at EMNLP 2026 (Main Conference).**
 
 Code for *SV-Detect: AI-generated Text Detection with Steering Vectors*.
 SV-Detect represents each text as the layer-wise alignment of its
