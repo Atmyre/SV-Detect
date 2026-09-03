@@ -1,10 +1,10 @@
-"""Per-token "fakeness" visualization for the FTD steering paper.
+"""Per-token AI-vs-human visualization for the SV-Detect paper.
 
-For each sampled text (real / fake), forward-pass GPT-Neo-2.7B, capture
-per-token residuals at the auto-selected best layer, project each token's
-residual onto the precomputed steering vector (logreg_l2 method), then render
-a PNG showing tokens colored by their dot-product score and an overall
-"FAKE"/"REAL" classification banner.
+For each sampled text (human / AI-generated), forward-pass GPT-Neo-2.7B,
+capture per-token residuals at the auto-selected best layer, project each
+token's residual onto the precomputed steering vector (logreg_l2 method),
+then render a PNG showing tokens colored by their dot-product score and an
+overall "AI-generated"/"Human" classification banner.
 
 Usage on the cluster:
     cd ${PROJECT_ROOT:-$(pwd)}
@@ -194,8 +194,8 @@ def lerp_color(c0, c1, t):
 
 
 WHITE = (255, 255, 255)
-RED   = (213,  84,  82)     # "fake" extreme (background)
-BLUE  = ( 82, 130, 213)     # "real" extreme (background)
+RED   = (213,  84,  82)     # AI-generated extreme (background)
+BLUE  = ( 82, 130, 213)     # human extreme (background)
 
 # Saturated text colors. Anchored at a near-black "neutral" so weakly-scored
 # tokens stay readable rather than washing out toward white. Extremes are
@@ -287,7 +287,7 @@ def _layout_text(display_tokens: List[str], scores: np.ndarray,
     glyph_h = ascent + descent
     band_pad_y = 3
     band_h = glyph_h + 2 * band_pad_y
-    line_gap = 8
+    line_gap = 3
     line_step = band_h + line_gap
     line_w_limit = width - pad
 
@@ -330,9 +330,9 @@ def _draw_colorbar(draw, width, pad, cbar_top, small_font):
         col = score_to_text_color(z_i)
         draw.rectangle((bar_x + i, cbar_top, bar_x + i + 1, cbar_top + bar_h),
                        fill=col)
-    draw.text((bar_x, cbar_top + bar_h + 4), "more real", font=small_font,
-              fill=TEXT_BLUE)
-    draw.text((bar_x + bar_w, cbar_top + bar_h + 4), "more fake",
+    draw.text((bar_x, cbar_top + bar_h + 4), "more human-like",
+              font=small_font, fill=TEXT_BLUE)
+    draw.text((bar_x + bar_w, cbar_top + bar_h + 4), "more AI-like",
               font=small_font, fill=TEXT_RED, anchor="rt")
 
 
@@ -357,8 +357,8 @@ def render_text(display_tokens: List[str], scores: np.ndarray,
     img = Image.new("RGB", (width, total_h), "white")
     draw = ImageDraw.Draw(img)
 
-    banner_color = RED if pred_label.upper() == "FAKE" else BLUE
-    msg = (f"Predicted: {pred_label.upper()}   "
+    banner_color = RED if pred_label == "AI-generated" else BLUE
+    msg = (f"Predicted: {pred_label}   "
            f"score {pred_score:+.2f}   "
            f"(truth: {true_label})")
     _draw_banner(draw, 0, 0, width, banner_h, banner_color, msg, bold,
@@ -374,17 +374,16 @@ def render_text(display_tokens: List[str], scores: np.ndarray,
 
 
 def _draw_compact_label(draw, x, y, pred, truth, bold_font, italic_font):
-    """Small colored dot + 'Predicted: FAKE  (truth: FAKE)' label.
+    """Small colored dot + 'Predicted: AI-generated  (ground truth: ...)' label.
 
     Returns the y position just below the label."""
-    pred_up = pred.upper()
-    label_color = RED if pred_up == "FAKE" else BLUE
+    label_color = RED if pred == "AI-generated" else BLUE
     dot_r = 7
     dot_cy = y + 11
     draw.ellipse((x, dot_cy - dot_r, x + 2 * dot_r, dot_cy + dot_r),
                  fill=label_color)
     tx = x + 2 * dot_r + 10
-    label_text = f"Predicted: {pred_up}"
+    label_text = f"Predicted: {pred}"
     draw.text((tx, y), label_text, font=bold_font, fill=label_color)
     bbox = draw.textbbox((tx, y), label_text, font=bold_font)
     sub_x = bbox[2] + 12
@@ -423,9 +422,9 @@ def _truncate_to_words(tokens, scores, keep_ratio=2 / 3):
 def render_pair(fake_tokens, fake_scores, fake_pred, fake_score, fake_truth,
                 real_tokens, real_scores, real_pred, real_score, real_truth,
                 out_path: Path,
-                width: int = 760, pad: int = 22, font_size: int = 19,
+                width: int = 760, pad: int = 22, font_size: int = 34,
                 scale_pct: float = 80.0,
-                keep_word_ratio: float = 2 / 3):
+                keep_word_ratio: float = 2 / 5):
     """Teaser-style pair: fake on top, hairline separator, real below.
     Compact colored-dot labels instead of full-width banners. No colorbar."""
     fake_tokens, fake_scores = _truncate_to_words(
@@ -438,7 +437,7 @@ def render_pair(fake_tokens, fake_scores, fake_pred, fake_score, fake_truth,
     italic = load_font(FONT_CANDIDATES_ITALIC, font_size - 4)
 
     label_block_h = 24       # height the compact label takes
-    after_label_gap = 8      # space between label and text
+    after_label_gap = 20     # space between label and text
     inter_gap = 18           # space between fake-end and real-label
     border_pad = 14          # inner padding from the rounded border
 
@@ -617,8 +616,8 @@ def main():
         # First, score every sample so we can render singles and pairs.
         per_class_info = {"real": [], "fake": []}
         for klass_name, klass_samples, true_label in (
-            ("real", real_pool, "REAL"),
-            ("fake", fake_pool, "FAKE"),
+            ("real", real_pool, "Human"),
+            ("fake", fake_pool, "AI-generated"),
         ):
             for i, s in enumerate(klass_samples):
                 tokens_display, resids = per_token_residuals(
@@ -628,7 +627,7 @@ def main():
                 per_tok = (layer_resid * sv_layer).sum(dim=-1)
                 per_tok_np = per_tok.numpy()
                 mean_score = float(per_tok_np.mean())
-                pred = "FAKE" if mean_score > threshold else "REAL"
+                pred = "AI-generated" if mean_score > threshold else "Human"
                 # Expand tokens with embedded newlines into separate "\n"
                 # markers and replicate their per-token score.
                 display, scores_expanded = [], []

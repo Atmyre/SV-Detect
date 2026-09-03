@@ -1,41 +1,79 @@
 # SV-Detect
 
-Code for *SV-Detect: Steering-Vector-Based Detection of Machine-Generated
-Text*. SV-Detect represents each text as the layer-wise alignment of its
-hidden-state activations with learned "real-vs-fake" steering vectors in
-a frozen reference language model, then trains a lightweight logistic
-regression on those alignment scores.
+Code for *SV-Detect: AI-generated Text Detection with Steering Vectors*.
+SV-Detect represents each text as the layer-wise alignment of its
+hidden-state activations with learned human-vs-AI-generated *steering
+vectors* in a frozen reference language model, and trains a lightweight
+logistic-regression head on those alignment scores. The detector is
+evaluated in-distribution on DetectRL and MIRAGE, out-of-distribution
+across benchmarks (DetectRL ↔ MIRAGE, → PADBen, → RAID), and against
+supervised (RoBERTa-fair), zero-shot (Log-Likelihood, DetectGPT,
+Binoculars, Fast-DetectGPT, …) and representation-based (RepreGuard)
+baselines.
 
 ## Layout
 
 ```
 sv-detect/
-├── src/                       # Pipeline + analysis code
-│   ├── extract/               # 1) activations -> SVs -> dot products
-│   │   ├── extract_activations.py
-│   │   ├── compute_steering_vectors.py
-│   │   └── train_logreg.py
-│   ├── classifier/            # 2) per-benchmark evaluation drivers
+├── src/
+│   ├── extract/                    # 1) activations → SVs → dot products
+│   │   ├── extract_activations.py       # forward pass, mean-pool per layer
+│   │   ├── compute_steering_vectors.py  # mean-diff / logreg / PCA construction
+│   │   ├── train_logreg.py              # StandardScaler + LogReg detection head
+│   │   ├── nb_pipeline.py               # shared library (SV construction,
+│   │   │                                # dot products, QR-orthonormalization,
+│   │   │                                # detector build/eval)
+│   │   ├── compute_dots_bulk.py         # batched dot-product projection for
+│   │   │                                # the DetectRL cross-source matrix
+│   │   └── all_dots.py                  # one-shot builder for every dot-product
+│   │                                    # file used downstream (MD 16-cell,
+│   │                                    # MIRAGE 3-vec, MD-4vec, MIRAGE-1vec)
+│   ├── classifier/                 # 2) per-benchmark drivers
 │   │   ├── analyze_detectrl.py
 │   │   └── analyze_mirage.py
-│   ├── interpret/             # 3) Section D interpretability code
-│   │   ├── interpret_steering_vectors.py
+│   ├── analysis/                   # 3) cross-benchmark + auxiliary evaluation
+│   │   ├── md_matrix.py                 # DetectRL Multi-Domain 16-cell matrix
+│   │   ├── all_experiments.py           # one-shot metrics dump across MD /
+│   │   │                                # MIRAGE-3vec / reverse transfer /
+│   │   │                                # MIRAGE-1vec
+│   │   ├── mirage_to_detectrl.py        # MIRAGE → DetectRL transfer, 3 SV
+│   │   │                                # construction variants side by side
+│   │   ├── padben_eval.py               # PADBen 5-task × 5-setup evaluation
+│   │   │                                # of pretrained SV-Detect detectors
+│   │   ├── raid_eval.py                 # RAID zero-shot transfer (24 configs)
+│   │   ├── raid_matrix.py               # RAID 24 × 24 cross-source matrix
+│   │   ├── raid_to_everything.py        # RAID-trained detector → DetectRL /
+│   │   │                                # MIRAGE / PADBen (backward direction)
+│   │   ├── layer_importance.py          # cross-benchmark layer-importance
+│   │   │                                # correlation (MIRAGE vs DetectRL)
+│   │   └── roberta_padben.py            # RoBERTa-fair baseline on PADBen
+│   ├── baselines/                  # 4) other-method comparisons
+│   │   ├── roberta_fair.py              # RoBERTa-base/large fine-tuned on the
+│   │   │                                # same MIRAGE pool SV-Detect uses
+│   │   └── prep_repreguard_data.py      # convert DetectRL / MIRAGE JSONs into
+│   │                                    # RepreGuard's expected input format
+│   ├── interpret/                  # 5) interpretability (Section 5)
+│   │   ├── interpret_steering_vectors.py       # per-layer attribution + logit-lens
 │   │   ├── interpret_steering_ngrams.py
 │   │   ├── interpret_steering_vectors_text.py
-│   │   ├── regex_detector.py
+│   │   ├── regex_detector.py                    # regex/stylistic baseline (generic)
 │   │   ├── regex_detector_detectrl.py
 │   │   ├── regex_detector_mirage.py
 │   │   ├── compare_sae_dense.py
 │   │   └── inspect_logreg_weights.py
-│   ├── ablation/              # 4) classifier / construction ablations
+│   ├── ablation/                   # 6) classifier + construction ablations
 │   │   └── compare_classifiers.py
-│   ├── visualize_tokens.py    # Figure 1 per-token visualisation
-│   └── download_data.py       # Helpers to fetch DetectRL / MIRAGE / COLING
-├── data/                      # (Reserved for cached datasets; gitignored)
-├── environment.yml            # Conda environment used in our experiments
-├── requirements.txt           # Pip equivalent for non-conda users
+│   ├── visualize_tokens.py         # Figure 1 per-token visualization
+│   └── download_data.py            # DetectRL / MIRAGE / COLING downloader
+├── data/                           # (Reserved for cached datasets; gitignored)
+├── environment.yml                 # Conda environment used in our experiments
+├── requirements.txt                # Pip equivalent for non-conda users
 └── README.md
 ```
+
+Analysis scripts read from `SVDETECT_BASE` (env var; default `.`). Set
+it to the root that contains `data/activations/`, `data/svs/`,
+`data/dots/`, `results/`, etc., or run from that directory.
 
 ## Quick start
 
@@ -60,8 +98,10 @@ python -m src.download_data --benchmark coling   # optional
 ```
 
 DetectRL and MIRAGE are pulled from their official HuggingFace mirrors.
-You will need a HuggingFace token (`export HF_TOKEN=...`) to download
-gated models such as `Llama-2-7b-hf`.
+PADBen (arXiv 2511.00416) and RAID (Dugan et al., ACL 2024) are pulled
+directly from their release archives; use their upstream download
+instructions. You will need a HuggingFace token (`export HF_TOKEN=...`)
+to load gated backbones such as `Llama-3.1-8B-Instruct`.
 
 ### 3. Extract activations
 
@@ -75,7 +115,8 @@ python -m src.extract.extract_activations \
 
 Output: per-sample mean-pooled residuals as
 `(N, num_layers, hidden_size)` `.npy` chunks. One forward per sample;
-splits run in parallel as a SLURM array (see `scripts/slurm/run_extract.slurm`).
+splits parallelise trivially. LLaMA-3.1-8B and other backbones use the
+same interface — pass `--llm meta-llama/Llama-3.1-8B-Instruct`.
 
 ### 4. Compute steering vectors + dot-product features
 
@@ -92,6 +133,25 @@ This produces both the steering vectors `steering_vectors_<method>.npy`
 `<split>_dot_products_<method>.npy` (shape `(N, L)`) for the downstream
 classifier.
 
+For the DetectRL Multi-Domain cross-source matrix and derived 4-vector /
+1-vector systems, use the batched builders:
+
+```bash
+# DetectRL MD: dot every subset test set with every subset SV
+python -m src.extract.compute_dots_bulk \
+    --acts-dir data/activations/gpt-neo-2.7B/DetectRL_MD \
+    --sv-dir   data/svs/gpt-neo-2.7B/DetectRL_MD \
+    --out-dir  data/dots/detectrl_md \
+    --train-subsets arxiv writing_prompt xsum yelp_review
+
+# Every dot-product family needed by downstream analysis (MD 16-cell,
+# MIRAGE-3vec, MD-4vec reverse-transfer, MIRAGE-1vec)
+python -m src.extract.all_dots \
+    --acts-root data/activations/gpt-neo-2.7B \
+    --sv-root   data/svs/gpt-neo-2.7B \
+    --out-root  data/dots
+```
+
 ### 5. Train and evaluate the detector
 
 ```bash
@@ -100,10 +160,21 @@ python -m src.classifier.analyze_detectrl \
     --svs-dir data/svs/gpt-neo-2.7B/DetectRL \
     --method logreg
 
-# MIRAGE
+# DetectRL Multi-Domain 16-cell cross-source matrix
+python -m src.analysis.md_matrix \
+    --dots-dir data/dots/detectrl_md \
+    --method logreg \
+    --out-json results/md_matrix.json
+
+# MIRAGE (3-vector orthonormal system)
 python -m src.classifier.analyze_mirage \
     --svs-dir data/svs/gpt-neo-2.7B/MIRAGE \
     --tasks generate polish rewrite
+
+# One-shot summary across MD / MIRAGE-3vec / reverse-transfer / MIRAGE-1vec
+python -m src.analysis.all_experiments \
+    --experiments md_16cell mirage_3vec reverse_transfer mirage_1vec \
+    --out-dir results/all_experiments
 
 # COLING-2025 MGT
 python -m src.extract.train_logreg \
@@ -112,22 +183,109 @@ python -m src.extract.train_logreg \
     --filters all woweak woTGPT35weak
 ```
 
-### 6. Interpretability (Section D)
+### 6. Cross-benchmark and OOD transfer
+
+Detectors trained on one benchmark, evaluated as-is on another
+(no target-benchmark training, no threshold recalibration):
 
 ```bash
-# D.1 + D.2: per-layer attribution + classical logit-lens
+# MIRAGE → DetectRL (3 SV construction variants: polish-only-500, union-800,
+# 3-vec orthonormal)
+python -m src.analysis.mirage_to_detectrl \
+    --mirage-svs-dir data/svs/gpt-neo-2.7B/MIRAGE \
+    --acts-root      data/activations/gpt-neo-2.7B/DetectRL_MD \
+    --out-json       results/mirage_to_detectrl.json
+
+# DetectRL / MIRAGE → PADBen (5 tasks × 5 setups per PADBen §5.1)
+python -m src.analysis.padben_eval \
+    --detector mirage_3vec \
+    --padben-root data/PADBen \
+    --acts-root   data/activations/gpt-neo-2.7B/PADBen \
+    --out-dir     results/padben
+
+# MIRAGE / MD-4vec → RAID (all 24 configs, zero-shot)
+python -m src.analysis.raid_eval \
+    --detector md_4vec \
+    --raid-root data/RAID \
+    --acts-root data/activations/gpt-neo-2.7B/RAID \
+    --out-dir   results/raid
+
+# In-domain RAID: 24 × 24 cross-source matrix (per-config SVs + classifier)
+python -m src.analysis.raid_matrix \
+    --acts-root data/activations/gpt-neo-2.7B/RAID \
+    --method    logreg \
+    --out-json  results/raid_matrix.json
+
+# RAID → DetectRL / MIRAGE / PADBen (backward direction, 6-vector RAID system)
+python -m src.analysis.raid_to_everything \
+    --raid-acts data/activations/gpt-neo-2.7B/RAID \
+    --targets   detectrl mirage padben \
+    --out-json  results/raid_to_everything.json
+```
+
+### 7. Baselines
+
+```bash
+# RoBERTa-fair: fine-tune RoBERTa on the *same* MIRAGE pool SV-Detect uses
+# (800 pairs = 500 polish + 150 generate + 150 rewrite, or polish-only 500)
+python -m src.baselines.roberta_fair \
+    --model roberta-base \
+    --mirage-train-dir data/MIRAGE/train \
+    --detectrl-root    data/DetectRL \
+    --subset all \
+    --out-dir results/roberta_fair/roberta-base
+
+# RepreGuard: convert DetectRL and MIRAGE into RepreGuard's input format,
+# then run their code (github.com/NLP2CT/RepreGuard) against these JSONs
+python -m src.baselines.prep_repreguard_data \
+    --mirage-train-dir       data/MIRAGE/train \
+    --mirage-root            data/MIRAGE \
+    --detectrl-benchmark-dir data/DetectRL \
+    --out-dir                data/repreguard_input
+
+# RoBERTa-fair on PADBen (matched-supervision comparison to SV-Detect)
+python -m src.analysis.roberta_padben \
+    --model-path  results/roberta_fair/roberta-base/model \
+    --model-label roberta-base-800p \
+    --padben-root data/PADBen \
+    --out-dir     results/padben_roberta
+```
+
+### 8. Interpretability (Section 5)
+
+```bash
+# Per-layer attribution + logit-lens for the top-contributing layers
 python -m src.interpret.interpret_steering_vectors \
     --llm EleutherAI/gpt-neo-2.7B \
     --sv-path data/svs/gpt-neo-2.7B/MIRAGE/steering_vectors_logreg_generate.npy \
     --top-k 12 --out-tsv interpret_out/logit_lens_mirage_generate.tsv
 
-# D.3: stylistic-feature baseline
-python -m src.interpret.regex_detector_detectrl --data-root data/DetectRL
-python -m src.interpret.regex_detector_mirage --data-root data/MIRAGE
+# Cross-benchmark layer-importance correlation (MIRAGE vs DetectRL-MD)
+python -m src.analysis.layer_importance \
+    --mirage-dots-dir  data/dots/mirage_3vec \
+    --md-dots-dir      data/dots/reverse_md4vec \
+    --method           mean \
+    --out-json         results/layer_importance.json
 
-# D.5 (Figure 1): per-token visualisation
+# Regex / stylistic-feature baselines
+python -m src.interpret.regex_detector_detectrl --data-root data/DetectRL
+python -m src.interpret.regex_detector_mirage   --data-root data/MIRAGE
+
+# Figure 1: per-token AI-vs-human projection visualisation
 python -m src.visualize_tokens \
     --sv-path data/svs/gpt-neo-2.7B/MIRAGE/steering_vectors_logreg_generate.npy \
     --raw-json data/MIRAGE/raw_texts/DIG/generate.json \
     --out-dir figures/teaser_pngs
 ```
+
+### 9. Ablations
+
+```bash
+# Downstream classifier (LogReg vs CatBoost vs KNN vs …) on the same
+# projection features
+python -m src.ablation.compare_classifiers \
+    --dots-dir data/svs/gpt-neo-2.7B/DetectRL_MD \
+    --method   logreg
+```
+
+See the paper for the reference numbers each of these reproduces.
