@@ -1,5 +1,7 @@
 # SV-Detect
 
+[![arXiv](https://img.shields.io/badge/arXiv-2606.07313-b31b1b.svg)](https://arxiv.org/abs/2606.07313)
+
 Code for *SV-Detect: AI-generated Text Detection with Steering Vectors*.
 SV-Detect represents each text as the layer-wise alignment of its
 hidden-state activations with learned human-vs-AI-generated *steering
