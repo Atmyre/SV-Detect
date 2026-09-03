@@ -1,0 +1,24 @@
+diff --git a/repe/rep_reading_pipeline.py b/repe/rep_reading_pipeline.py
+index 62551d8..9c57ab4 100644
+--- a/repe/rep_reading_pipeline.py
++++ b/repe/rep_reading_pipeline.py
+@@ -72,7 +72,7 @@ class RepReadingPipeline(Pipeline):
+ 
+         if self.image_processor:
+             return self.image_processor(inputs, add_end_of_utterance_token=False, return_tensors="pt")
+-        return self.tokenizer(inputs, return_tensors=self.framework, **tokenizer_kwargs)
++        return self.tokenizer(inputs, return_tensors="pt", truncation=True, max_length=2048, **tokenizer_kwargs)
+ 
+     def postprocess(self, outputs):
+         return outputs
+@@ -122,8 +122,8 @@ class RepReadingPipeline(Pipeline):
+             for batch in hidden_states_batch:
+                 for layer in hidden_layers:
+                     if layer in batch:
+-                        hidden_states[layer].append(batch[layer].detach().cpu().numpy())
+-    		del hidden_states_batch
++                        hidden_states[layer].append(batch[layer].detach().float().cpu().numpy())
++            del hidden_states_batch
+             torch.cuda.empty_cache()
+         hidden_states = {k: np.vstack(v) for k, v in hidden_states.items()}
+         return hidden_states

@@ -264,7 +264,9 @@ python -m src.baselines.roberta_fair \
     --out-dir results/roberta_fair/roberta-base
 
 # RepreGuard: convert DetectRL and MIRAGE into RepreGuard's input format,
-# then run their code (github.com/NLP2CT/RepreGuard) against these JSONs
+# then run their code (github.com/NLP2CT/RepreGuard) against these JSONs.
+# Reproduction requires a small patch to their pipeline —
+# see patches/repreguard/README.md.
 python -m src.baselines.prep_repreguard_data \
     --mirage-train-dir       data/MIRAGE/train \
     --mirage-root            data/MIRAGE \
@@ -329,7 +331,7 @@ settings:
 | Component | Setting |
 |---|---|
 | Frozen backbone (default) | `EleutherAI/gpt-neo-2.7B`, fp16, 32 layers, hidden 2560 |
-| Frozen backbone (matched-supervision) | `meta-llama/Llama-3.1-8B-Instruct`, fp16 |
+| Frozen backbone (RepreGuard comparison) | `meta-llama/Llama-3.1-8B-Instruct`, fp16 — matches RepreGuard's own backbone |
 | Activation extraction | `max_seq_length=2048`, mean-pool per layer |
 | Steering vector (default) | Logistic regression, `C=0.01`, liblinear, ℓ₂, `fit_intercept=False` |
 | Steering vector (alternatives) | Mean-difference, PCA (PC1 of paired differences) |
