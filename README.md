@@ -318,6 +318,32 @@ python -m src.ablation.compare_classifiers \
 
 See the paper for the reference numbers each of these reproduces.
 
+## Hyperparameters
+
+The full set of hyperparameters (backbones, extraction, steering-vector
+construction, detection head, per-experiment SV systems, RoBERTa-fair
+training, dataset sizes, and evaluation metrics) is documented in
+[`configs/hyperparameters.yaml`](configs/hyperparameters.yaml). Headline
+settings:
+
+| Component | Setting |
+|---|---|
+| Frozen backbone (default) | `EleutherAI/gpt-neo-2.7B`, fp16, 32 layers, hidden 2560 |
+| Frozen backbone (matched-supervision) | `meta-llama/Llama-3.1-8B-Instruct`, fp16 |
+| Activation extraction | `max_seq_length=2048`, mean-pool per layer |
+| Steering vector (default) | Logistic regression, `C=0.01`, liblinear, ℓ₂, `fit_intercept=False` |
+| Steering vector (alternatives) | Mean-difference, PCA (PC1 of paired differences) |
+| Detection head | `StandardScaler` → `LogisticRegression(C=1.0, solver=liblinear, penalty=l2, max_iter=100, fit_intercept=False)` |
+| RoBERTa-fair baseline | 5 epochs, batch 16, lr 2e-5, `max_length=512`, seed 42 |
+| Random seed | 42 (throughout) |
+| Evaluation metrics | AUROC, AUPR, F1, Balanced Accuracy, MCC, TPR@FPR ∈ {1%, 5%, 10%} |
+
+Per-benchmark training-pool sizes (MIRAGE 500-polish default vs. 800-pair
+augmented; DetectRL Multi-Domain 50-fake-per-cell subsampling; RAID
+6544-train per config; PADBen zero-shot with no training) and
+multi-vector SV system definitions (MIRAGE-3vec, MD-4vec, RAID-6vec)
+are in the same YAML file.
+
 ## Citation
 
 ```bibtex

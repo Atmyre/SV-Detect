@@ -1,0 +1,178 @@
+# SV-Detect — canonical hyperparameters
+#
+# This file documents the settings used to produce the paper's results.
+# Values match the argparse defaults in src/ and the setup described in
+# Section 4.1 of the paper. Anything not listed here is the source module's
+# built-in default.
+
+seed: 42
+
+# ---------------------------------------------------------------------------
+# Frozen reference language model (activation source)
+# ---------------------------------------------------------------------------
+backbones:
+  main:
+    hf_id: EleutherAI/gpt-neo-2.7B      # paper Section 4.1 default
+    layers: 32
+    hidden: 2560
+    dtype: float16                       # weights on GPU; token averaging in fp32
+  matched_repreguard:                    # LLaMA backbone used for matched
+    hf_id: meta-llama/Llama-3.1-8B-Instruct   # comparisons with RepreGuard
+    layers: 32
+    hidden: 4096
+    dtype: float16
+  ablation_alternatives:                 # Backbone ablation (Appendix C)
+    - EleutherAI/pythia-2.8b
+    - Qwen/Qwen3-1.7B-Base
+    - meta-llama/Llama-2-7b-hf
+    - google/gemma-2-2b
+
+# ---------------------------------------------------------------------------
+# Activation extraction (per input text)
+# ---------------------------------------------------------------------------
+extract:
+  max_seq_length: 2048                   # tokenizer truncation
+  pooling: mean                          # over token dimension, per layer
+  precision_accumulate: float32          # token averaging always in fp32
+  precision_save: float32                # on-disk numpy dtype
+                                         # (fp16 halves disk usage if needed)
+
+# ---------------------------------------------------------------------------
+# Steering-vector construction (per layer, per class-pair)
+# ---------------------------------------------------------------------------
+steering_vector:
+  methods: [mean, logreg, pca]
+  default: logreg                        # paper's main choice
+  logreg:
+    C: 0.01
+    solver: liblinear
+    penalty: l2
+    fit_intercept: false
+    max_samples_per_class: 50000
+  pca:
+    n_components: 1
+    on: paired_differences               # PC1 of (a_fake_i - a_real_i)
+  mean:
+    normalize: unit_l2                   # (mu_fake - mu_real) / ||.||
+
+# ---------------------------------------------------------------------------
+# Multi-vector systems used in specific experiments
+# ---------------------------------------------------------------------------
+sv_systems:
+  mirage_1vec_polish_500:                # paper's main MIRAGE detector
+    n_train_pairs: 500
+    sources: {polish: 500}
+    directions_per_layer: 1
+  mirage_3vec:                           # Appendix F.4 task-specific variant
+    tasks: [generate, polish, rewrite]
+    orthonormalize: qr
+    directions_per_layer: 3
+    n_train_pairs: 800                   # 500 polish + 150 generate + 150 rewrite
+  mirage_1vec_union_800:                 # Ablation: single SV on all 800 pairs
+    n_train_pairs: 800
+    sources: {polish: 500, generate: 150, rewrite: 150}
+    directions_per_layer: 1
+  detectrl_md_4vec:                      # DetectRL Multi-Domain 4-vec system
+    subsets: [arxiv, writing_prompt, xsum, yelp_review]
+    orthonormalize: qr
+    directions_per_layer: 4
+  raid_6vec:                             # RAID 6-vec system (per-llm_type SV)
+    llm_types: [gpt2, mistral, mistral-chat, llama-chat, mpt, mpt-chat]
+    orthonormalize: qr
+    directions_per_layer: 6
+
+# ---------------------------------------------------------------------------
+# Detection head (default classifier on projection features)
+# ---------------------------------------------------------------------------
+detector:
+  pipeline: [StandardScaler, LogisticRegression]
+  classifier:
+    C: 1.0                               # paper Section 4.1
+    solver: liblinear
+    penalty: l2
+    max_iter: 100
+    fit_intercept: false
+    random_state: 42
+
+# Downstream classifier ablation (Section 4.3)
+classifier_ablation:
+  - LogisticRegression                   # default
+  - CatBoost
+  - KNN
+
+# ---------------------------------------------------------------------------
+# Baseline: RoBERTa-fair (matched-supervision comparison)
+# ---------------------------------------------------------------------------
+roberta_fair:
+  models: [roberta-base, roberta-large]
+  train_pool_variants:
+    augmented_800:
+      n_pairs: 800
+      sources: {polish: 500, generate: 150, rewrite: 150}
+    polish_only_500:
+      n_pairs: 500
+      sources: {polish: 500}
+  epochs: 5
+  batch_size: 16
+  lr: 2.0e-5
+  max_length: 512
+  optimizer: AdamW                       # HuggingFace default
+  scheduler: linear_warmup
+
+# ---------------------------------------------------------------------------
+# Baseline: RepreGuard reimplementation
+# ---------------------------------------------------------------------------
+repreguard:
+  observer_backbones:
+    - EleutherAI/gpt-neo-2.7B            # matched-backbone comparison
+    - meta-llama/Llama-3.1-8B-Instruct   # RepreGuard's default backbone
+  input_max_length: 2048                 # requires patching their pipeline;
+                                         # see paper Appendix G reproduction notes
+  input_format:
+    fields: [direct_prompt, human_text]  # per-pair JSON records
+
+# ---------------------------------------------------------------------------
+# Datasets — training-side sample counts we actually use
+# ---------------------------------------------------------------------------
+data:
+  detectrl:
+    multi_domain:
+      subsets: [arxiv, writing_prompt, xsum, yelp_review]
+      train_fake_per_cell: 50            # subsampling, follows Wu et al. 2024
+    multi_llm:
+      subsets: [ChatGPT, Claude-instant, Google-PaLM, Llama-2-70b]
+    multi_attack:
+      families: [direct_prompt, prompt_attack, paraphrase_attack,
+                 perturbation, data_mixing]
+  mirage:
+    scenarios: [DIG, SIG]
+    tasks: [generate, polish, rewrite]
+    train_pool_default: {polish: 500}    # paper's main MIRAGE setup
+  padben:
+    tasks: [1, 2, 3, 4, 5]
+    setups:
+      - single_sentence_exhaustive
+      - single_sentence_30_70
+      - single_sentence_50_50
+      - single_sentence_80_20
+      - sentence_pair
+  raid:
+    llm_types: [gpt2, mistral, mistral-chat, llama-chat, mpt, mpt-chat]
+    decoding: [greedy, sampling]
+    rep_penalty: [no, yes]
+    configs_total: 24                    # 6 llm_types x 2 x 2
+    test_records_per_config: 1000
+    train_records_per_config: 6544
+
+# ---------------------------------------------------------------------------
+# Evaluation metrics reported in the paper
+# ---------------------------------------------------------------------------
+metrics:
+  - AUROC
+  - AUPR
+  - F1
+  - Balanced_Accuracy
+  - Matthews_correlation_coefficient
+  - TPR@FPR=0.01
+  - TPR@FPR=0.05                         # RAID's headline metric
+  - TPR@FPR=0.10
